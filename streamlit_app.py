@@ -251,15 +251,15 @@ with tab2:
 
     teams_df.sort_values(by="Punteggio Squadra", ascending=False, inplace=True)
     teams_df.reset_index(drop=True, inplace=True)
+    if len(teams_df!=0):
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+        sns.barplot(data=teams_df, x="Punteggio Squadra", y="Giocatori", color="r")
 
-    sns.barplot(data=teams_df, x="Punteggio Squadra", y="Giocatori", color="r")
-
-    # Add a legend and informative axis label
-    plt.title(f"Classifica punteggio squadra rosa", fontsize=15)
-    ax.legend(ncol=1, loc="best", frameon=False)
-    ax.set(ylabel="",
-        xlabel="Punteggio")
-    sns.despine(left=True, bottom=True)
-    st.pyplot(fig)
+        # Add a legend and informative axis label
+        plt.title(f"Classifica punteggio squadra rosa", fontsize=15)
+        ax.legend(ncol=1, loc="best", frameon=False)
+        ax.set(ylabel="",
+            xlabel="Punteggio")
+        sns.despine(left=True, bottom=True)
+        st.pyplot(fig)
