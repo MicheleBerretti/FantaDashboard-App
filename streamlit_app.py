@@ -98,14 +98,6 @@ with tab1:
         st.write("### Quick look at top players in selected role:")
         st.write(players_df)
 
-        
-        # Plotting the data
-        for j in range(len(players)):
-            if conf[j] == 0.75:
-                players[j] = f"{players[j]}*"
-            elif conf[j] == 0.5:
-                players[j] = f"{players[j]}**"
-
         f, ax = plt.subplots(figsize=(10, 5))
         sns.set_color_codes("pastel")
 
