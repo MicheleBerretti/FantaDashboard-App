@@ -84,7 +84,7 @@ with tab1:
         df = df.sort_values("Punteggio", ascending=False)
 
         over = np.array(df["Punteggio"]).astype(float)
-        players = np.array(df["Giocatore"]).astype(str)
+        players = np.array(df["Nome"]).astype(str)
         team = np.array(df["Squadra"]).astype(str)
 
         players_df = pd.DataFrame()
