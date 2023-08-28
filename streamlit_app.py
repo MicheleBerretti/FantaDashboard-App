@@ -88,6 +88,14 @@ with tab1:
         team = np.array(df["Squadra"]).astype(str)
         conf = np.array(df["Livello di confidenza"]).astype(float)
 
+        for j in range(len(conf)):
+            if conf[j] == 1:
+                conf_v.append("High")
+            elif conf[j] == 0.75:
+                conf_v.append("Low")
+            else:
+                conf_v.append("Lowest")
+
         players_df = pd.DataFrame()
 
         players_df["Players"] = playrs[:20]
@@ -102,7 +110,7 @@ with tab1:
         sns.set_color_codes("pastel")
 
 
-        sns.barplot(x=over, y=playrs, hue=conf, label="Overall")
+        sns.barplot(x=over, y=playrs, hue=conf_v, label="Overall")
 
         # Add a legend and informative axis label
         plt.title(f"Top 20 {role}", fontsize=15)
