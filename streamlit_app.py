@@ -58,19 +58,13 @@ tab1, tab2, tab3 = st.tabs(["Players Stats and Analysis", "Team Stats and Analys
 
 with tab1:
     # Asking role
-    role = st.radio("Which role you want to check?", ("All", "Goalkeeper", "Defender", "Midfielder", "Attacker"))
+    role = st.radio("Which role you want to check?", ("All", "POR", "DIF", "CEN", "ATT"))
 
     # Importing the dataset of the given role
-    if role == "Goalkeeper":
-        df = pd.read_csv('portieri.csv')
-    elif role == "Defender":
-        df = pd.read_csv('difensori.csv')
-    elif role == "Midfielder":
-        df = pd.read_csv('centrocampisti.csv')
-    elif role == "Attacker":
-        df = pd.read_csv('attaccanti.csv')
-    else:
+    if role == "All":
         df = pd.read_csv('players.csv')
+    else:
+        df = pd.read_csv(f'db_{role}.csv')
 
     st.write("### Showing players for selected role:")
     st.write(df)
@@ -78,12 +72,9 @@ with tab1:
 
     if role != "All":
 
-        df = df.sort_values("Punteggio Goduria", ascending=False)
+        df = df.sort_values("Punteggio", ascending=False)
 
         over = np.array(df["Punteggio Goduria"]).astype(float)
-        mult = np.array(df["Base Moltiplicativa"]).astype(float)
-        add = np.array(df["Base Additiva"]).astype(float)
-        live = np.array(df["Live Updates"]).astype(float)
         players = np.array(df["Giocatore"]).astype(str)
         team = np.array(df["Squadra"]).astype(str)
 
@@ -91,9 +82,6 @@ with tab1:
 
         players_df["Players"] = players
         players_df["Squadra"] = team
-        players_df["Base Moltiplicativa"] = mult
-        players_df["Base Additiva"] = add
-        players_df["Live Update"] = live
         players_df["Overall"] = over
 
         st.write("### Quick look at top players in selected role:")
@@ -103,19 +91,21 @@ with tab1:
         # Plotting the data
         
         players = np.array(players_df[:20]["Players"])
+
+        for j in range(len(players)):
+            if df["Livello di confidenza"] == 0.75:
+                players[j].append("*")
+            elif df["Livello di confidenza"] == 0.5:
+                players[j].append("**")
+
+        
         overall = np.array(players_df[:20]["Overall"])
-        mult = np.array(players_df[:20]["Base Moltiplicativa"])
-        add = np.array(players_df[:20]["Base Additiva"])
-        live = np.array(players_df[:20]["Live Update"])
 
         f, ax = plt.subplots(figsize=(10, 5))
         sns.set_color_codes("pastel")
 
 
         sns.barplot(data=players_df, x=overall, y=players, color="b", label="Overall")
-        sns.barplot(data=players_df, x=mult, y=players, color="r", label="Base Moltiplicativa")
-        sns.barplot(data=players_df, x=add, y=players, color="g", label="Base Additiva")
-        sns.barplot(data=players_df, x=live, y=players, color="y", label="Live Update")
 
         # Add a legend and informative axis label
         plt.title(f"Top 20 {role}", fontsize=15)
@@ -417,632 +407,213 @@ def get_attributes(url: str) -> dict:
     return attributes
 
 
+@st.cache_data()
+def csv_exporter(database, role):
+    # Roles: POR, DIF, CEN, ATT
+    # Housekeeping
+    db_raw = database[database['Ruolo'] == role]
+
+    warning_flag = []
+    fatal_flag = []
+
+    # Mise en place (*Proceeds to chefkiss*)
+
+    team = np.array(db_raw["Squadra"])
+    avg1 = np.array(db_raw["Fantamedia anno 2020-2021"])
+    avg2 = np.array(db_raw["Fantamedia anno 2021-2022"])
+    avg3 = np.array(db_raw["Fantamedia anno 2022-2023"])
+    flag_new = np.array(db_raw['Nuovo acquisto']) # This needs to be better considered. Right now is just -3 malus for new players. 
+    score_base = np.array(db_raw["Punteggio"]).astype(int)
 
 
-def gk_csv(database):
-    gk = database[database["Ruolo"] == "POR"]
-    team = np.array(gk["Squadra"])
-    avg1 = np.array(gk["Fantamedia anno 2020-2021"])
-    avg2 = np.array(gk["Fantamedia anno 2021-2022"])
-    avg3 = np.array(gk["Fantamedia anno 2022-2023"])
-    flag_new = np.array(gk['Nuovo acquisto'])
-    score_base = np.array(gk["Punteggio"]).astype(int)
-
-    for i in range(len(avg1)):
-        if flag_new[i] == True:
-            flag_new[i] = 0
+    delta = []
+    for j in range(len(avg3)):
+        if avg3[j] != "nd" and avg2[j] != "nd" and avg1[j] != "nd":
+            delta.append(round((float(avg3[j]) - float(avg1[j])), 1))
+            warning_flag.append(False)
+            fatal_flag.append(False)
+        elif avg3[j] != "nd" and avg2[j] != "nd" and avg1[j] == "nd":
+            delta.append(round((float(avg3[j]) - float(avg2[j])), 1))
+            warning_flag.append(True)
+            fatal_flag.append(False)
         else:
-            flag_new[i] = 1
-        if avg3[i] == "nd":
-            avg3[i] = 0
-        if avg2[i] == "nd":
-            avg2[i] = avg3[i]
-        if avg1[i] == "nd":
-            avg1[i] = avg2[i]
+            delta.append(0)
+            warning_flag.append(True)
+            fatal_flag.append(True)
 
-    flag_new = flag_new.astype(int)
-    avg1 = avg1.astype(float)
-    avg2 = avg2.astype(float)
-    avg3 = avg3.astype(float)
-    delta1 = avg2 - avg1
-    delta2 = avg3 - avg1
-    delta = ((delta1 + delta2)*flag_new)
-    gk["Delta Fantamedia"] = delta
-
-    delta = delta/100
+    # FINAL DATA PRODUCT 1: delta
+    delta = np.array(delta)
+    # AUX DATA PRODUCTS: warning_flag, fatal_flag
 
 
-
-    pres = np.array(gk["Presenze previste"])
-    gol = np.array(gk["Gol previsti"])
-    ass = np.array(gk["Assist previsti"])
+    pres = np.array(db_raw["Presenze previste"])
+    gol = np.array(db_raw["Gol previsti"])
+    assist = np.array(db_raw["Assist previsti"])    
 
     for i in range(len(gol)):
         pres[i] = pres[i][:2].replace("/", "").replace(" ", "")
         gol[i] = gol[i][:2].replace("/", "").replace(" ", "")
-        ass[i] = ass[i][:2].replace("/", "").replace(" ", "")
+        assist[i] = assist[i][:2].replace("/", "").replace(" ", "")
 
-    gol = gol.astype(float)
-    pres = pres.astype(float)
-    ass = ass.astype(float)
+    gol = gol.astype(int)
+    pres = pres.astype(int)
+    assist = assist.astype(int)
 
-    null = []
-
+    ratio = []
     for i in range(len(gol)):
         if pres[i] == 0:
-            null.append(0)
+            ratio.append(0)
         else:
-            null.append(1)
+            if role == "POR":
+                ratio.append(round(gol[i]/pres[i], 2))
+            elif role == "DIF" or role == "CEN":
+                ratio.append(round((0.4*gol[i]+0.8*assist[i])/pres[i], 2))
+            else:
+                ratio.append(round((0.8*gol[i]+0.4*assist[i])/pres[i], 2))
 
-    kda = (gol+ass)/pres
-    null = np.array(null)
-    kda = kda*null
-    kda = np.nan_to_num(kda, nan=0.0)
+    # FINAL DATA PRODUCT 2: ratio (gol/pres, lower is better for a gk)
+    ratio = np.array(ratio)
 
-    pres = pres/(pres.max())
+    pres = np.array(pres)
+    pres = pres/pres.max()
 
-    score1 = (kda/10) + (pres/10)
+    # FINAL DATA PRODUCT 3: pres (presenze, higher is better, 1 is max)
 
-    score0 = score_base*(0.3+delta+score1)
+    inv = np.array(db_raw["Buon investimento"]).astype(float)/100
+    inj_res = np.array(db_raw["Resistenza infortuni"]).astype(float)/100
 
-    gok = pd.DataFrame()
-    gok["Giocatore"] = np.array(gk["Nome"])
-    gok["Miglioramento Stagionale"] = delta
-    gok["Gol/Presenze"] = score1
-    gok["Base Moltiplicativa"] = score0
+    # FINAL DATA PRODUCT 4: inv (buon investimento, higher is better, 1 is max)
+    inv = np.array(inv)
+    # FINAL DATA PRODUCT 5: inj_res (resistenza infortuni, higher is better, 1 is max)
+    inj_res = np.array(inj_res)
 
-    skilled = np.array(gk["Skills"])
-    new = np.array(gk["Nuovo acquisto"]).astype(bool)
-    inv = np.array(gk["Buon investimento"]).astype(float)
-    inj_res = np.array(gk["Resistenza infortuni"]).astype(float)
+    inj = np.array(db_raw["Infortunato"])
+
+    # FINAL DATA PRODUCT 6: inj (infortunato, boolean, True if injured)
+    inj = np.array(inj)
+
+    trend = np.array(db_raw["Trend"])
+    for j,val in enumerate(trend):
+        if val =="UP":
+            trend[j] = 1
+        elif val == "DOWN":
+            trend[j] = -1
+        else:
+            trend[j] = 0.5
+
+    # FINAL DATA PRODUCT 7: trend (trend, higher is better, 1 is max)
+    trend = np.array(trend)
+
+    skilled = np.array(db_raw["Skills"])
 
 
     skill_value = []
     for j in range(len(skilled)):
         skilled[j] = ast.literal_eval(skilled[j])
         kk = 0
-        if new[j] == True:
-            kk = -3
-        kk+=inv[j]/20
-        kk+=inj_res[j]/20
         for value in skilled[j]:
             if value == "Titolare":
-                kk+=3
+                kk+=0.1
             elif value == "Fuoriclasse":
-                kk+=1
+                kk+=0.35
             elif value == "Buona Media":
-                kk+=2
+                kk+=0.2
             elif value == "Goleador":
-                kk+=4
+                kk+=0.4
             elif value == "Assistman":
-                kk+=2
+                kk+=0.4
             elif value == "Piazzati":
-                kk+=2
+                kk+=0.1
             elif value == "Rigorista":
-                kk+=5
+                kk+=0.1
             elif value == "Giovane Talento":
-                kk+=2
+                kk+=0.05
             elif value == "Panchinaro":
-                kk+=-4
+                kk+=-0.4
             elif value == "Falloso":
-                kk+=-2
+                kk+=-0.3
             elif value == "Outsider":
-                kk+=2
+                kk+=0.05
             else:
                 pass
+        skill_value.append(round(kk,2))
 
-        skill_value.append(kk)
+    confidence = []
 
-    score2 = np.array(skill_value)
-    gok["Base Additiva"] = score2
+    for j in range(len(warning_flag)):
+        if warning_flag[j] == True and fatal_flag[j] == False:
+            confidence.append(0.75)
+        elif warning_flag[j] == True and fatal_flag[j] == True:
+            confidence.append(0.5)
+        else:
+            confidence.append(1)
 
-    recom = np.array(gk["Consigliato prossima giornata"])
-    inj = np.array(gk["Infortunato"])
-    trend = np.array(gk["Trend"])
+    # FINAL DATA PRODUCT 8: skill_value (skill_value, higher is better, 1 is max)
+    skill_value = np.array(skill_value)
 
 
-    score3 = []
+    # Scoring
+    score = []
 
-    for j in range(len(recom)):
-        kk = 0
-        if recom[j] == True:
-            kk+=5
+    delta_norm = normalise(delta, 0, 5)
+    delta_norm = np.array(delta_norm)
+    ratio_norm = normalise(ratio, 0, 7)
+    ratio_norm = np.array(ratio_norm)
+    pres_norm = normalise(pres, 0, 7)
+    pres_norm = np.array(pres_norm)
+    inv_norm = normalise(inv, 0, 5)
+    inv_norm = np.array(inv_norm)
+    inj_res_norm = normalise(inj_res, 0, 5)
+    inj_res_norm = np.array(inj_res_norm)
+    trend_norm = normalise(trend, 0, 2)
+    trend_norm = np.array(trend_norm)
+    skill_value_norm = normalise(skill_value, 0, 10)
+    skill_value_norm = np.array(skill_value_norm)
+    score_base_norm = normalise(score_base, 0, 50)
+    score_base_norm = np.array(score_base_norm)
+
+    flag_new_norm = []
+    for j in range(len(flag_new)):
+        if flag_new[j] == True:
+            flag_new_norm = 0
+        else:
+            flag_new_norm = 5
+    flag_new_norm = np.array(flag_new_norm)
+
+
+    inj_norm = []
+    for j in range(len(inj)):
         if inj[j] == True:
-            kk-=10
-        if trend[j] =="UP":
-            kk+=8
-        elif trend[j] =="STABLE":
-            kk+=2
-        elif trend[j] == "DOWN":
-            kk-=5
-        score3.append(kk)
-
-    score3 = np.array(score3)
-
-    gok["Live Updates"] = score3
-
-    score0 = (60*score0)/score0.max()
-    score2 = (20*score2)/score2.max()
-    score3 = (20*score3)/score3.max()
-
-    goduria_score = score0+score2+score3
-
-    gok["Punteggio Goduria"] = goduria_score
-    gok["Squadra"] = team
-    gok = gok.sort_values("Punteggio Goduria", ascending=False)
-
-    gok.to_csv("portieri.csv")
-
-
-
-def dc_csv(database):
-    dc = database[database["Ruolo"] == "DIF"]
-    team = np.array(dc["Squadra"])
-
-    avg1 = np.array(dc["Fantamedia anno 2020-2021"])
-    avg2 = np.array(dc["Fantamedia anno 2021-2022"])
-    avg3 = np.array(dc["Fantamedia anno 2022-2023"])
-    flag_new = np.array(dc['Nuovo acquisto'])
-    score_base = np.array(dc["Punteggio"]).astype(int)
-
-    for i in range(len(avg1)):
-        if flag_new[i] == True:
-            flag_new[i] = 0
+            inj_norm.append(0)
         else:
-            flag_new[i] = 1
-        if avg3[i] == "nd":
-            avg3[i] = 0
-        if avg2[i] == "nd":
-            avg2[i] = avg3[i]
-        if avg1[i] == "nd":
-            avg1[i] = avg2[i]
-
-    flag_new = flag_new.astype(int)
-    avg1 = avg1.astype(float)
-    avg2 = avg2.astype(float)
-    avg3 = avg3.astype(float)
-    delta1 = avg2 - avg1
-    delta2 = avg3 - avg1
-    delta = ((delta1 + delta2)*flag_new)
-
-    delta = (delta/delta.max())/10
-
-
-    dc["Delta Fantamedia"] = delta
-
-
-    pres = np.array(dc["Presenze previste"])
-    gol = np.array(dc["Gol previsti"])
-    ass = np.array(dc["Assist previsti"])
-
-    for i in range(len(gol)):
-        pres[i] = pres[i][:2].replace("/", "").replace(" ", "")
-        gol[i] = gol[i][:2].replace("/", "").replace(" ", "")
-        ass[i] = ass[i][:2].replace("/", "").replace(" ", "")
-
-    gol = gol.astype(float)
-    pres = pres.astype(float)
-    ass = ass.astype(float)
-
-    null = []
-
-    for i in range(len(gol)):
-        if pres[i] == 0:
-            null.append(0)
-        else:
-            null.append(1)
-
-    kda = (gol+ass)/pres
-    null = np.array(null)
-    kda = kda*null
-    kda = np.nan_to_num(kda, nan=0.0)
-
-    pres = pres/(pres.max())
-
-    score1 = (kda/10) + (pres/10)
-
-    score0 = score_base*(0.3+delta+score1)
-
-    dif = pd.DataFrame()
-    dif["Giocatore"] = np.array(dc["Nome"])
-    dif["Miglioramento Stagionale"] = delta
-    dif["Gol/Presenze"] = score1
-    dif["Base Moltiplicativa"] = score0
-
-
-    skilled = np.array(dc["Skills"])
-    new = np.array(dc["Nuovo acquisto"]).astype(bool)
-    inv = np.array(dc["Buon investimento"]).astype(float)
-    inj_res = np.array(dc["Resistenza infortuni"]).astype(float)
-
-    skill_value = []
-    for j in range(len(skilled)):
-        skilled[j] = ast.literal_eval(skilled[j])
-        kk = 0
-        if new[j] == True:
-            kk = -3
-        kk+=inv[j]/20
-        kk+=inj_res[j]/20
-        for value in skilled[j]:
-            if value == "Titolare":
-                kk+=3
-            elif value == "Fuoriclasse":
-                kk+=1
-            elif value == "Buona Media":
-                kk+=2
-            elif value == "Goleador":
-                kk+=4
-            elif value == "Assistman":
-                kk+=2
-            elif value == "Piazzati":
-                kk+=2
-            elif value == "Rigorista":
-                kk+=5
-            elif value == "Giovane Talento":
-                kk+=2
-            elif value == "Panchinaro":
-                kk+=-4
-            elif value == "Falloso":
-                kk+=-2
-            elif value == "Outsider":
-                kk+=2
-            else:
-                pass
-
-        skill_value.append(kk)
-
-    score2 = np.array(skill_value)
-    dif["Base Additiva"] = score2
-
-    recom = np.array(dc["Consigliato prossima giornata"])
-    inj = np.array(dc["Infortunato"])
-    trend = np.array(dc["Trend"])
-
-
-    score3 = []
-
-    for j in range(len(recom)):
-        kk = 0
-        if recom[j] == True:
-            kk+=5
-        if inj[j] == True:
-            kk-=10
-        if trend[j] =="UP":
-            kk+=8
-        elif trend[j] =="STABLE":
-            kk+=2
-        elif trend[j] == "DOWN":
-            kk-=5
-        score3.append(kk)
-
-    score3 = np.array(score3)
-
-    dif["Live Updates"] = score3
-
-    score0 = (60*score0)/score0.max()
-    score2 = (20*score2)/score2.max()
-    score3 = (20*score3)/score3.max()
-
-    goduria_score = score0+score2+score3
-
-    dif["Punteggio Goduria"] = goduria_score
-    dif["Squadra"] = team
-    dif = dif.sort_values("Punteggio Goduria", ascending=False)
-
-    dif.to_csv("difensori.csv")
-
-
-def cc_csv(database):
-    cc = database[database["Ruolo"] == "CEN"]
-    team = np.array(cc["Squadra"])
-
-    avg1 = np.array(cc["Fantamedia anno 2020-2021"])
-    avg2 = np.array(cc["Fantamedia anno 2021-2022"])
-    avg3 = np.array(cc["Fantamedia anno 2022-2023"])
-    flag_new = np.array(cc['Nuovo acquisto'])
-    score_base = np.array(cc["Punteggio"]).astype(int)
-
-    for i in range(len(avg1)):
-        if flag_new[i] == True:
-            flag_new[i] = 0
-        else:
-            flag_new[i] = 1
-        if avg3[i] == "nd":
-            avg3[i] = 0
-        if avg2[i] == "nd":
-            avg2[i] = avg3[i]
-        if avg1[i] == "nd":
-            avg1[i] = avg2[i]
-
-    flag_new = flag_new.astype(int)
-    avg1 = avg1.astype(float)
-    avg2 = avg2.astype(float)
-    avg3 = avg3.astype(float)
-    delta1 = avg2 - avg1
-    delta2 = avg3 - avg1
-    delta = ((delta1 + delta2)*flag_new)
-
-    delta = (delta/delta.max())/10
-
-
-    cc["Delta Fantamedia"] = delta
-
-
-    pres = np.array(cc["Presenze previste"])
-    gol = np.array(cc["Gol previsti"])
-    ass = np.array(cc["Assist previsti"])
-
-    for i in range(len(gol)):
-        pres[i] = pres[i][:2].replace("/", "").replace(" ", "")
-        gol[i] = gol[i][:2].replace("/", "").replace(" ", "")
-        ass[i] = ass[i][:2].replace("/", "").replace(" ", "")
-
-    gol = gol.astype(float)
-    pres = pres.astype(float)
-    ass = ass.astype(float)
-
-    null = []
-
-    for i in range(len(gol)):
-        if pres[i] == 0:
-            null.append(0)
-        else:
-            null.append(1)
-
-    kda = (gol+ass)/pres
-    null = np.array(null)
-    kda = kda*null
-    kda = np.nan_to_num(kda, nan=0.0)
-
-    pres = pres/(pres.max())
-
-    score1 = (kda/10) + (pres/10)
-
-    score0 = score_base*(0.3+delta+score1)
-
-    cen = pd.DataFrame()
-    cen["Giocatore"] = np.array(cc["Nome"])
-    cen["Miglioramento Stagionale"] = delta
-    cen["Gol/Presenze"] = score1
-    cen["Base Moltiplicativa"] = score0
-
-    skilled = np.array(cc["Skills"])
-    new = np.array(cc["Nuovo acquisto"]).astype(bool)
-    inv = np.array(cc["Buon investimento"]).astype(float)
-    inj_res = np.array(cc["Resistenza infortuni"]).astype(float)
-
-    skill_value = []
-    for j in range(len(skilled)):
-        skilled[j] = ast.literal_eval(skilled[j])
-        kk = 0
-        if new[j] == True:
-            kk = -3
-        kk+=inv[j]/20
-        kk+=inj_res[j]/20
-        for value in skilled[j]:
-            if value == "Titolare":
-                kk+=3
-            elif value == "Fuoriclasse":
-                kk+=1
-            elif value == "Buona Media":
-                kk+=2
-            elif value == "Goleador":
-                kk+=4
-            elif value == "Assistman":
-                kk+=2
-            elif value == "Piazzati":
-                kk+=2
-            elif value == "Rigorista":
-                kk+=5
-            elif value == "Giovane Talento":
-                kk+=2
-            elif value == "Panchinaro":
-                kk+=-4
-            elif value == "Falloso":
-                kk+=-2
-            elif value == "Outsider":
-                kk+=2
-            else:
-                pass
-
-        skill_value.append(kk)
-
-    score2 = np.array(skill_value)
-    cen["Base Additiva"] = score2
-
-    recom = np.array(cc["Consigliato prossima giornata"])
-    inj = np.array(cc["Infortunato"])
-    trend = np.array(cc["Trend"])
-
-
-    score3 = []
-
-    for j in range(len(recom)):
-        kk = 0
-        if recom[j] == True:
-            kk+=5
-        if inj[j] == True:
-            kk-=10
-        if trend[j] =="UP":
-            kk+=8
-        elif trend[j] =="STABLE":
-            kk+=2
-        elif trend[j] == "DOWN":
-            kk-=5
-        score3.append(kk)
-
-    score3 = np.array(score3)
-
-    cen["Live Updates"] = score3
-
-    score0 = (60*score0)/score0.max()
-    score2 = (20*score2)/score2.max()
-    score3 = (20*score3)/score3.max()
-
-    goduria_score = score0+score2+score3
-
-    cen["Punteggio Goduria"] = goduria_score
-    cen["Squadra"] = team
-    cen = cen.sort_values("Punteggio Goduria", ascending=False)
-
-    cen.to_csv("centrocampisti.csv")
-
-
-def atk_csv(database):
-    att = database[database["Ruolo"] == "ATT"]
-    team = np.array(att["Squadra"])
-
-    avg1 = np.array(att["Fantamedia anno 2020-2021"])
-    avg2 = np.array(att["Fantamedia anno 2021-2022"])
-    avg3 = np.array(att["Fantamedia anno 2022-2023"])
-    flag_new = np.array(att['Nuovo acquisto'])
-    score_base = np.array(att["Punteggio"]).astype(int)
-
-    for i in range(len(avg1)):
-        if flag_new[i] == True:
-            flag_new[i] = 0
-        else:
-            flag_new[i] = 1
-        if avg3[i] == "nd":
-            avg3[i] = 0
-        if avg2[i] == "nd":
-            avg2[i] = avg3[i]
-        if avg1[i] == "nd":
-            avg1[i] = avg2[i]
-
-    flag_new = flag_new.astype(int)
-    avg1 = avg1.astype(float)
-    avg2 = avg2.astype(float)
-    avg3 = avg3.astype(float)
-    delta1 = avg2 - avg1
-    delta2 = avg3 - avg1
-    delta = ((delta1 + delta2)*flag_new)
-
-    delta = (delta/delta.max())/10
-
-
-    att["Delta Fantamedia"] = delta
-
-
-    pres = np.array(att["Presenze previste"])
-    gol = np.array(att["Gol previsti"])
-    ass = np.array(att["Assist previsti"])
-
-    for i in range(len(gol)):
-        pres[i] = pres[i][:2].replace("/", "").replace(" ", "")
-        gol[i] = gol[i][:2].replace("/", "").replace(" ", "")
-        ass[i] = ass[i][:2].replace("/", "").replace(" ", "")
-
-    gol = gol.astype(float)
-    pres = pres.astype(float)
-    ass = ass.astype(float)
-
-    null = []
-
-    for i in range(len(gol)):
-        if pres[i] == 0:
-            null.append(0)
-        else:
-            null.append(1)
-
-    kda = (gol+ass)/pres
-    null = np.array(null)
-    kda = kda*null
-    kda = np.nan_to_num(kda, nan=0.0)
-
-    pres = pres/(pres.max())
-
-    score1 = (kda/10) + (pres/10)
-
-    score0 = score_base*(0.3+delta+score1)
-
-    atk = pd.DataFrame()
-    atk["Giocatore"] = np.array(att["Nome"])
-    atk["Miglioramento Stagionale"] = delta
-    atk["Gol/Presenze"] = score1
-    atk["Base Moltiplicativa"] = score0
-
-    skilled = np.array(att["Skills"])
-    new = np.array(att["Nuovo acquisto"]).astype(bool)
-    inv = np.array(att["Buon investimento"]).astype(float)
-    inj_res = np.array(att["Resistenza infortuni"]).astype(float)
-
-    skill_value = []
-    for j in range(len(skilled)):
-        skilled[j] = ast.literal_eval(skilled[j])
-        kk = 0
-        if new[j] == True:
-            kk = -3
-        kk+=inv[j]/20
-        kk+=inj_res[j]/20
-        for value in skilled[j]:
-            if value == "Titolare":
-                kk+=3
-            elif value == "Fuoriclasse":
-                kk+=1
-            elif value == "Buona Media":
-                kk+=2
-            elif value == "Goleador":
-                kk+=4
-            elif value == "Assistman":
-                kk+=2
-            elif value == "Piazzati":
-                kk+=2
-            elif value == "Rigorista":
-                kk+=5
-            elif value == "Giovane Talento":
-                kk+=2
-            elif value == "Panchinaro":
-                kk+=-4
-            elif value == "Falloso":
-                kk+=-2
-            elif value == "Outsider":
-                kk+=2
-            else:
-                pass
-
-        skill_value.append(kk)
-
-    score2 = np.array(skill_value)
-    atk["Base Additiva"] = score2
-
-    recom = np.array(att["Consigliato prossima giornata"])
-    inj = np.array(att["Infortunato"])
-    trend = np.array(att["Trend"])
-
-
-    score3 = []
-
-    for j in range(len(recom)):
-        kk = 0
-        if recom[j] == True:
-            kk+=5
-        if inj[j] == True:
-            kk-=10
-        if trend[j] =="UP":
-            kk+=8
-        elif trend[j] =="STABLE":
-            kk+=2
-        elif trend[j] == "DOWN":
-            kk-=5
-        score3.append(kk)
-
-    score3 = np.array(score3)
-
-    atk["Live Updates"] = score3
-
-    score0 = (60*score0)/score0.max()
-    score2 = (20*score2)/score2.max()
-    score3 = (20*score3)/score3.max()
-
-    goduria_score = score0+score2+score3
-
-    atk["Punteggio Goduria"] = goduria_score
-    atk["Squadra"] = team
-    atk = atk.sort_values("Punteggio Goduria", ascending=False)
-
-    atk.to_csv("attaccanti.csv")
-
+            inj_norm.append(4)
+    inj_norm = np.array(inj_norm)
+
+    # Sum all the normalised arrays
+    score = delta_norm + ratio_norm + pres_norm + inv_norm + inj_res_norm + trend_norm + skill_value_norm + score_base_norm + flag_new_norm + inj_norm
+
+    score = [round(i, 2) for i in score]
+
+    # Goalkeepers clean database
+
+    db = pd.DataFrame()
+    db["Nome"] = db_raw["Nome"]
+    db["Squadra"] = team
+    db["Trend Stagionale"] = delta
+    db["Ratio Gol/Pres"] = ratio
+    db["Presenze"] = pres
+    db["Buon Investimento"] = inv
+    db["Resistenza Infortuni"] = inj_res
+    db["Infortunato"] = inj
+    db["Trend"] = trend
+    db["Skill Value"] = skill_value
+    db["Punteggio Base"] = score_base
+    db["Nuovo Acquisto"] = flag_new
+    db["Punteggio"] = score
+    db["Livello di confidenza"] = confidence
+
+
+    db.to_csv(f"db_{role}.csv", index=False)
 
 
 password = "Forza Roma!"
@@ -1093,20 +664,20 @@ with tab3:
             except:
                 st.toast("Please update players database", icon="⚠️")
             if st.button("Goalkeeper"):
-                gk_csv(database)
+                csv_exporter(database, "POR")
                 st.toast("Goalkeepers csv exported", icon="✅")
             if st.button("Defenders"):
-                dc_csv(database)
+                csv_exporter(database, "DIF")
                 st.toast("Defenders csv exported", icon="✅")
             if st.button("Midfielders"):
-                cc_csv(database)
+                csv_exporter(database, "CEN")
                 st.toast("Midfielders csv exported", icon="✅")
             if st.button("Forwards"):
-                atk_csv(database)
+                csv_exporter(database, "ATT")
                 st.toast("Forwards csv exported", icon="✅")
             if st.button("All players"):
-                gk_csv(database)
-                dc_csv(database)
-                cc_csv(database)
-                atk_csv(database)
+                csv_exporter(database, "POR")
+                csv_exporter(database, "DIF")
+                csv_exporter(database, "CEN")
+                csv_exporter(database, "ATT")
                 st.toast("All players csv exported", icon="✅")
