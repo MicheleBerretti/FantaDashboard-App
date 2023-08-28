@@ -103,6 +103,7 @@ with tab1:
         players_df["Squadra"] = team[:20]
         players_df["Overall"] = over[:20]
         players_df["Livello di confidenza"] = conf[:20]
+        players_df["Conf_v"] = conf_v[:20]
 
         st.write("### Quick look at top players in selected role:")
         st.write(players_df)
@@ -111,7 +112,7 @@ with tab1:
         sns.set_color_codes("pastel")
 
 
-        sns.barplot(data=players_df, x="Overall", y="Players", hue="Livello di confidenza", label="Overall")
+        sns.barplot(data=players_df, x="Overall", y="Players", hue="Conf_v", label="Overall")
 
         # Add a legend and informative axis label
         plt.title(f"Top 20 {role}", fontsize=15)
