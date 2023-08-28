@@ -84,13 +84,13 @@ with tab1:
         df = df.sort_values("Punteggio", ascending=False)
 
         over = np.array(df["Punteggio"]).astype(float)
-        players = np.array(df["Nome"]).astype(str)
+        playrs = np.array(df["Nome"]).astype(str)
         team = np.array(df["Squadra"]).astype(str)
         conf = np.array(df["Livello di confidenza"]).astype(float)
 
         players_df = pd.DataFrame()
 
-        players_df["Players"] = players
+        players_df["Players"] = playrs
         players_df["Squadra"] = team
         players_df["Overall"] = over
         players_df["Livello di confidenza"] = conf
