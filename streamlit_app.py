@@ -12,7 +12,16 @@ from random import randint
 import ast
 
 
-
+# Create a function that given an array comprised between its max and its min, morphs it into a given range defined by a new min and a new max
+def normalise(array, new_min, new_max):
+    old_min = min(array)
+    old_max = max(array)
+    old_range = old_max - old_min
+    new_range = new_max - new_min
+    new_array = []
+    for i in array:
+        new_array.append(((i - old_min) / old_range) * new_range + new_min)
+    return new_array
 
 @st.cache_data()
 def query_team(dict_team, team_name):
