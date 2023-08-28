@@ -58,7 +58,7 @@ tab1, tab2, tab3 = st.tabs(["Players Stats and Analysis", "Team Stats and Analys
 
 with tab1:
     # Asking role
-    role = st.radio("Which role you want to check?", ("All", "POR", "DIF", "CEN", "ATT"))
+    role = st.radio("Which role you want to check?", ("All", "POR", "DIF", "CEN","TRQ", "ATT"))
 
     # Importing the dataset of the given role
     if role == "All":
@@ -74,7 +74,7 @@ with tab1:
 
         df = df.sort_values("Punteggio", ascending=False)
 
-        over = np.array(df["Punteggio Goduria"]).astype(float)
+        over = np.array(df["Punteggio"]).astype(float)
         players = np.array(df["Giocatore"]).astype(str)
         team = np.array(df["Squadra"]).astype(str)
 
