@@ -86,12 +86,14 @@ with tab1:
         over = np.array(df["Punteggio"]).astype(float)
         players = np.array(df["Nome"]).astype(str)
         team = np.array(df["Squadra"]).astype(str)
+        conf = np.array(df["Livello di confidenza"]).astype(float)
 
         players_df = pd.DataFrame()
 
         players_df["Players"] = players
         players_df["Squadra"] = team
         players_df["Overall"] = over
+        players_df["Livello di confidenza"] = conf
 
         st.write("### Quick look at top players in selected role:")
         st.write(players_df)
@@ -100,11 +102,12 @@ with tab1:
         # Plotting the data
         
         players = np.array(players_df[:20]["Players"])
+        conf = np.array(players_df[:20]["Players"])
 
         for j in range(len(players)):
-            if df["Livello di confidenza"] == 0.75:
+            if conf[j] == 0.75:
                 players[j].append("*")
-            elif df["Livello di confidenza"] == 0.5:
+            elif conf[j] == 0.5:
                 players[j].append("**")
 
         
