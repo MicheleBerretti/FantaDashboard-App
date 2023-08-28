@@ -90,34 +90,27 @@ with tab1:
 
         players_df = pd.DataFrame()
 
-        players_df["Players"] = playrs
-        players_df["Squadra"] = team
-        players_df["Overall"] = over
-        players_df["Livello di confidenza"] = conf
+        players_df["Players"] = playrs[:20]
+        players_df["Squadra"] = team[:20]
+        players_df["Overall"] = over[:20]
+        players_df["Livello di confidenza"] = conf[:20]
 
         st.write("### Quick look at top players in selected role:")
         st.write(players_df)
 
         
         # Plotting the data
-        
-        players = np.array(players_df[:20]["Players"])
-        conf = np.array(players_df[:20]["Players"])
-
         for j in range(len(players)):
             if conf[j] == 0.75:
                 players[j] = f"{players[j]}*"
             elif conf[j] == 0.5:
                 players[j] = f"{players[j]}**"
 
-        
-        overall = np.array(players_df[:20]["Overall"])
-
         f, ax = plt.subplots(figsize=(10, 5))
         sns.set_color_codes("pastel")
 
 
-        sns.barplot(data=players_df, x=overall, y=players, color="r", label="Overall")
+        sns.barplot(data=df, x="Punteggio", y="Nome", hue="Livello di confidenza", label="Overall")
 
         # Add a legend and informative axis label
         plt.title(f"Top 20 {role}", fontsize=15)
