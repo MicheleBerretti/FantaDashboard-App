@@ -672,6 +672,9 @@ with tab3:
             if st.button("Midfielders"):
                 csv_exporter(database, "CEN")
                 st.toast("Midfielders csv exported", icon="✅")
+            if st.button("Attacking Midfielders"):
+                csv_exporter(database, "TRQ")
+                st.toast("Attacking Midfielders csv exported", icon="✅")
             if st.button("Forwards"):
                 csv_exporter(database, "ATT")
                 st.toast("Forwards csv exported", icon="✅")
@@ -679,5 +682,6 @@ with tab3:
                 csv_exporter(database, "POR")
                 csv_exporter(database, "DIF")
                 csv_exporter(database, "CEN")
+                csv_exporter(database, "TRQ")
                 csv_exporter(database, "ATT")
                 st.toast("All players csv exported", icon="✅")
