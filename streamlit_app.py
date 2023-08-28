@@ -106,9 +106,9 @@ with tab1:
 
         for j in range(len(players)):
             if conf[j] == 0.75:
-                players[j].append("*")
+                players[j] = players[j]+"*"
             elif conf[j] == 0.5:
-                players[j].append("**")
+                players[j] = players[j]+"**"
 
         
         overall = np.array(players_df[:20]["Overall"])
