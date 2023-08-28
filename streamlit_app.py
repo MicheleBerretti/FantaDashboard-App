@@ -111,7 +111,7 @@ with tab1:
         sns.set_color_codes("pastel")
 
 
-        sns.barplot(x=over, y=playrs, hue_order=conf_v, label="Overall")
+        sns.barplot(x=over[:20], y=playrs[:20], hue_order=conf_v[:20], label="Overall")
 
         # Add a legend and informative axis label
         plt.title(f"Top 20 {role}", fontsize=15)
