@@ -88,6 +88,7 @@ with tab1:
         team = np.array(df["Squadra"]).astype(str)
         conf = np.array(df["Livello di confidenza"]).astype(float)
 
+        conf_v = []
         for j in range(len(conf)):
             if conf[j] == 1:
                 conf_v.append("High")
