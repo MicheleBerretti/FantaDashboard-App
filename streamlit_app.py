@@ -474,13 +474,13 @@ def csv_exporter(database, role):
             ratio.append(0)
         else:
             if role == "POR":
-                ratio.append(round(gol[i]/pres[i], 2))
+                ratio.append(round(pres[i]/gol[i], 2))
             elif role == "DIF" or role == "CEN":
                 ratio.append(round((0.4*gol[i]+0.8*assist[i])/pres[i], 2))
             else:
                 ratio.append(round((0.8*gol[i]+0.4*assist[i])/pres[i], 2))
 
-    # FINAL DATA PRODUCT 2: ratio (gol/pres, lower is better for a gk)
+    # FINAL DATA PRODUCT 2: ratio (gol(+assist)/pres, lower is better for a gk, otherwise higher is better)
     ratio = np.array(ratio)
 
     pres = np.array(pres)
