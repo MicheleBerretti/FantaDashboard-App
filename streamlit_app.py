@@ -66,150 +66,138 @@ st.title(":orange[FantaCalcio Dashboard]")
 tab1, tab2, tab3 = st.tabs(["Players Stats and Analysis", "Team Stats and Analysis", "Database Updater"])
 
 with tab1:
-    # Asking role
-    role = st.radio("Which role you want to check?", ("All", "POR", "DIF", "CEN","TRQ", "ATT"))
+    st.header("🔎 Player Stats and Analysis")
+    st.markdown("Select a role to view player statistics, rankings, and confidence levels.")
 
-    # Importing the dataset of the given role
+    # Role selection with icons
+    role_options = {
+        "All": "All Roles",
+        "POR": "🧤 Goalkeepers",
+        "DIF": "🛡️ Defenders",
+        "CEN": "⚙️ Midfielders",
+        "TRQ": "🎩 Attacking Midfielders",
+        "ATT": "🎯 Forwards"
+    }
+    role = st.radio("Choose role:", list(role_options.keys()), format_func=lambda x: role_options[x])
+
+    # Load dataset
     if role == "All":
         df = pd.read_csv('players.csv')
     else:
         df = pd.read_csv(f'db_{role}.csv')
 
-    st.write("### Showing players for selected role:")
-    st.write(df)
-
+    st.subheader("Players Table")
+    st.dataframe(df, use_container_width=True)
 
     if role != "All":
-
         df = df.sort_values("Punteggio", ascending=False)
 
-        over = np.array(df["Punteggio"]).astype(float)
-        playrs = np.array(df["Nome"]).astype(str)
-        team = np.array(df["Squadra"]).astype(str)
-        conf = np.array(df["Livello di confidenza"]).astype(float)
+        # Prepare top 20 players
+        top_n = 20
+        players_df = df.head(top_n)[["Nome", "Squadra", "Punteggio", "Livello di confidenza"]].copy()
+        players_df.rename(columns={
+            "Nome": "Player",
+            "Squadra": "Team",
+            "Punteggio": "Score",
+            "Livello di confidenza": "Confidence"
+        }, inplace=True)
 
-        conf_v = []
-        for j in range(len(conf)):
-            if conf[j] == 1:
-                conf_v.append("High")
-            elif conf[j] == 0.75:
-                conf_v.append("Low")
+        # Confidence as badge
+        def confidence_badge(val):
+            if val == 1:
+                return "🟢 High"
+            elif val == 0.75:
+                return "🟡 Medium"
             else:
-                conf_v.append("Lowest")
+                return "🔴 Low"
+        players_df["Confidence"] = players_df["Confidence"].apply(confidence_badge)
 
-        players_df = pd.DataFrame()
+        st.markdown(f"#### 🏆 Top {top_n} {role_options[role]}")
+        st.dataframe(players_df, use_container_width=True, height=500)
 
-        players_df["Players"] = playrs[:20]
-        players_df["Squadra"] = team[:20]
-        players_df["Overall"] = over[:20]
-        players_df["Livello di confidenza"] = conf[:20]
-        players_df["Conf_v"] = conf_v[:20]
+        # Bar chart
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.barplot(data=players_df, x="Score", y="Player", palette="viridis")
+        plt.title(f"Top {top_n} {role_options[role]}", fontsize=16)
+        ax.set_xlabel("Score")
+        ax.set_ylabel("")
+        st.pyplot(fig, use_container_width=True)
 
-        st.write("### Quick look at top players in selected role:")
-        st.write(players_df)
-
-        f, ax = plt.subplots(figsize=(10, 5))
-        sns.set_color_codes("pastel")
-
-
-        sns.barplot(data=players_df, x="Overall", y="Players", label="Overall")
-
-        # Add a legend and informative axis label
-        plt.title(f"Top 20 {role}", fontsize=15)
-        ax.legend(ncol=1, loc="best", frameon=False)
-        ax.set(ylabel="",
-            xlabel="Punteggio")
-        sns.despine(left=True, bottom=True)
-        st.pyplot(f)
+        # Show team distribution
+        st.markdown("#### Team Distribution")
+        team_counts = players_df["Team"].value_counts()
+        st.bar_chart(team_counts)
 
  
  
 with tab2:
-    #Static, aggiornato di stagione in stagione per tenere conto di promossi e retrocessi
-    team_name = ["Lazio", "Sassuolo", "Milan", "Cagliari", "Napoli", "Udinese", "Genoa", "Juventus", "Roma", "Atalanta", "Bologna", "Fiorentina", "Torino", "Verona", "Inter", "Empoli", "Frosinone", "Salernitana", "Lecce", "Monza"]
-    team_id = [487, 488, 489, 490, 492, 494, 495, 496, 497, 499, 500, 502, 503, 504, 505, 511, 512, 514, 867, 1579]
+    st.header("🏟️ Team Stats and Analysis")
+    st.markdown("Analyze your fantasy team by selecting players and viewing their predicted scores based on upcoming fixtures.")
+
+    # Static team info
+    team_name = [
+        "Lazio", "Sassuolo", "Milan", "Cagliari", "Napoli", "Udinese", "Genoa", "Juventus", "Roma", "Atalanta",
+        "Bologna", "Fiorentina", "Torino", "Verona", "Inter", "Parma", "Pisa", "Cremonese", "Lecce", "Como"
+    ]
+    team_id = [487, 488, 489, 490, 492, 494, 495, 496, 497, 499, 500, 502, 503, 504, 505, 523, 801, 520, 867, 895]
     dict_team = dict(zip(team_name, team_id))
 
     conn = http.client.HTTPSConnection("v3.football.api-sports.io")
-
     headers = {
         'x-rapidapi-host': "v3.football.api-sports.io",
         'x-rapidapi-key': "848ca4816ddc2f145caa0e03175a7df8"
-        }
-    
-    
-    players_db = df = pd.read_csv('players.csv')
+    }
 
-    player_name = st.selectbox("Which player you want to check?", players_db["Nome"])
+    players_db = pd.read_csv('players.csv')
 
+    st.subheader("🔍 Individual Player Stats")
+    player_name = st.selectbox("Select a player to view stats:", players_db["Nome"])
     player_stats = players_db.loc[players_db['Nome'] == player_name]
-    team_name = player_stats["Squadra"].values[0]
-    if team_name == "Roma":
+    team_name_selected = player_stats["Squadra"].values[0]
+    if team_name_selected == "Roma":
         st.toast("Daje Roma Daje", icon="🐺")
+    if team_name_selected == "Lazio":
+        st.toast("Lazio Merda", icon="💩")
     player_role = player_stats["Ruolo"].values[0]
-    st.write("### Showing stats for selected player:")
-    st.write(player_stats) 
-    
-    
-    # Make it recursive for each player in the team.
+
+    with st.expander("Show selected player stats"):
+        st.dataframe(player_stats, use_container_width=True)
+
+    st.divider()
+
+    st.subheader("👥 Team Score Prediction")
+    st.markdown("Select your squad to see their predicted team scores for the next match.")
+
+    players_list = st.multiselect(
+        "Select players in your fantasy team:",
+        players_db["Nome"],
+        help="Choose multiple players to analyze your team."
+    )
 
     team_score_list = []
-
-
-    debug = False
-
-
-    # Elenco giocatori in rosa
-
-    #players_list = ["Pellegrini Lorenzo", "Osimhen Victor", "Dybala Paulo", "Mancini Gianluca", "Berardi Domenico", "Sanabria Antonio"]
-
-    players_list = list(st.multiselect("Which players are in your team?", players_db["Nome"]))
-
     players_list_online = []
 
-    for player_name in players_list:
-        
+    progress = st.progress(0, text="Fetching team predictions...") if players_list else None
+
+    for idx, player_name in enumerate(players_list):
         try:
-        
-            players_db = pd.read_csv("players.csv")
             player_stats = players_db.loc[players_db['Nome'] == player_name]
             team_name = player_stats["Squadra"].values[0]
             player_role = player_stats["Ruolo"].values[0]
 
-
             parsed = query_team(dict_team, team_name)
-            
-
-            index = []
-            j=0
-            for j in range(len(parsed["response"])):
-                league = parsed["response"][j]["league"]["name"]
-                if league == "Serie A":
-                    index.append(j)
-
-
+            index = [j for j in range(len(parsed["response"])) if parsed["response"][j]["league"]["name"] == "Serie A"]
             latest_index = index[-1]
             latest_match_id = parsed["response"][latest_index]["fixture"]["id"]
 
-
             conn.request("GET", f"/predictions?fixture={latest_match_id}", headers=headers)
-
             res = conn.getresponse()
             data = res.read()
             parsed = json.loads(data)
 
+            home = 1 if parsed['response'][0]["teams"]["home"]["name"].find(team_name) != -1 else 0
+            win = 1 if parsed['response'][0]["predictions"]["winner"]["name"].find(team_name) != -1 else 0
 
-
-            if parsed['response'][0]["teams"]["home"]["name"].find(team_name) != -1:
-                home = 1
-            else:
-                home = 0
-                
-            if parsed['response'][0]["predictions"]["winner"]["name"].find(team_name) != -1:
-                win = 1
-            else:
-                win = 0
-                
             if home == 1:
                 form = int(parsed['response'][0]["comparison"]["form"]["home"][0:2])
                 form_att = int(parsed['response'][0]["comparison"]["att"]["home"][0:2])
@@ -222,53 +210,44 @@ with tab2:
                 form_def = int(parsed['response'][0]["comparison"]["def"]["away"][0:2])
                 poiss = int(parsed['response'][0]["comparison"]["poisson_distribution"]["away"][0:2])
                 total = int(parsed['response'][0]["comparison"]["total"]["away"][0:2])
-                
+
             team_score = 0
-
             if win == 1:
-                team_score = team_score + 3
-                
+                team_score += 3
             team_score += score_percentile(form)
-
-            if check_role(player_role) == 1:
-                team_score += score_percentile(form_att)
-            else:
-                team_score += score_percentile(form_def)
-                
+            team_score += score_percentile(form_att if check_role(player_role) == 1 else form_def)
             team_score += score_percentile(poiss)
-
             team_score += score_percentile(total)
 
             team_score_list.append(team_score)
             players_list_online.append(player_name)
-            
-        except:
-            st.toast("Error in fetching data for selected player", icon="⚠️")
-        
-    st.write("### Showing score for selected team:")
-    st.write(dict(zip(players_list,team_score_list)))
+        except Exception as e:
+            st.toast(f"Error fetching data for {player_name}", icon="⚠️")
+        if progress:
+            progress.progress((idx + 1) / len(players_list), text="Fetching team predictions...")
 
+    if progress:
+        progress.empty()
 
-    teams_df = pd.DataFrame()
+    if players_list_online:
+        st.markdown("### 🏅 Team Score Table")
+        teams_df = pd.DataFrame({
+            "Player": players_list_online,
+            "Team Score": team_score_list
+        }).sort_values(by="Team Score", ascending=False).reset_index(drop=True)
 
-    teams_df["Giocatori"] = players_list_online
-    teams_df["Punteggio Squadra"] = team_score_list
+        st.dataframe(teams_df, use_container_width=True, height=400)
 
-    teams_df.sort_values(by="Punteggio Squadra", ascending=False, inplace=True)
-    teams_df.reset_index(drop=True, inplace=True)
-    if len(teams_df!=0):
+        st.markdown("### 📊 Team Score Bar Chart")
         fig, ax = plt.subplots(figsize=(10, 5))
-
-        sns.barplot(data=teams_df, x="Punteggio Squadra", y="Giocatori", color="r")
-
-        # Add a legend and informative axis label
-        plt.title(f"Classifica punteggio squadra rosa", fontsize=15)
-        ax.legend(ncol=1, loc="best", frameon=False)
-        ax.set(ylabel="",
-            xlabel="Punteggio")
+        sns.barplot(data=teams_df, x="Team Score", y="Player", palette="rocket")
+        plt.title("Team Score Ranking", fontsize=15)
+        ax.set_xlabel("Score")
+        ax.set_ylabel("")
         sns.despine(left=True, bottom=True)
-        st.pyplot(fig)
-        
+        st.pyplot(fig, use_container_width=True)
+    else:
+        st.info("Select players to view your team score analysis.")
         
         
         
@@ -426,9 +405,15 @@ def csv_exporter(database, role):
     # Mise en place (*Proceeds to chefkiss*)
 
     team = np.array(db_raw["Squadra"])
-    avg1 = np.array(db_raw["Fantamedia anno 2020-2021"])
-    avg2 = np.array(db_raw["Fantamedia anno 2021-2022"])
-    avg3 = np.array(db_raw["Fantamedia anno 2022-2023"])
+    # Dynamically get the last three years for "Fantamedia anno XXXX-YYYY"
+    current_year = pd.Timestamp.now().year
+    avg1_col = f"Fantamedia anno {current_year-4}-{current_year-3}"
+    avg2_col = f"Fantamedia anno {current_year-3}-{current_year-2}"
+    avg3_col = f"Fantamedia anno {current_year-2}-{current_year-1}"
+
+    avg1 = np.array(db_raw.get(avg1_col, ["nd"] * len(db_raw)))
+    avg2 = np.array(db_raw.get(avg2_col, ["nd"] * len(db_raw)))
+    avg3 = np.array(db_raw.get(avg3_col, ["nd"] * len(db_raw)))
     flag_new = np.array(db_raw['Nuovo acquisto']) # This needs to be better considered. Right now is just -3 malus for new players. 
     score_base = np.array(db_raw["Punteggio"]).astype(int)
 
@@ -623,7 +608,7 @@ def csv_exporter(database, role):
     db.to_csv(f"db_{role}.csv", index=False)
 
 
-password = "Forza Roma!"
+password = "Forza Roma!" # This is just a placeholder, please use Streamlit secrets management to set a real password
 
 with tab3:
     
@@ -639,56 +624,77 @@ with tab3:
         col1, col2 = st.columns(2)
         
         with col1:
-            
-            st.write("## :red[random debug stuff... Needs to be hidden better!]")
-        
+            st.header("Players URLs Debug")
+            st.caption("This section is for admin/debug purposes. URLs are used for database updates.")
+
             players_urls = []
-            for i in range(0, len(roles), 1):
-                    list = get_players(roles[i])
-                    [players_urls.append(k) for k in list]
-            with open(r"players_urls.txt", "w") as fp:
-                    for item in players_urls:
-                        fp.write("%s\n" % item)            
+            for role in roles:
+                urls = get_players(role)
+                players_urls.extend(urls)
+
+            # Show summary info instead of raw debug output
+            st.write(f"Total player URLs fetched: **{len(players_urls)}**")
+            st.write("Example URLs:", players_urls[:2])
+
+            # Save URLs to file
+            with open("players_urls.txt", "w") as fp:
+                for item in players_urls:
+                    fp.write("%s\n" % item)
+
+            st.success("Players URLs have been saved to players_urls.txt")
 
         with col2:
-            
             st.header("Database updater")
-            if st.button("Update players database"):
+
+            if st.button("🔄 Update players database"):
                 players_updater = []
-                my_bar = st.progress(0, text="Downloading Database")
-                steps_perc = 100/len(players_urls)
-                for i in range(0, len(players_urls), 1):
-                    player_up = get_attributes(players_urls[i])
-                    players_updater.append(player_up)
-                    my_bar.progress(int((i+1)*steps_perc), text="Downloading players database, please wait...")
-                df = pd.DataFrame.from_dict(players_updater)
+                my_bar = st.progress(0)
+                steps_perc = 100 / len(players_urls)
+
+                with st.spinner("Downloading players database..."):
+                    start_time = time.time()
+                    for i, url in enumerate(players_urls):
+                        player_up = get_attributes(url)
+                        players_updater.append(player_up)
+                        my_bar.progress(int((i + 1) * steps_perc))
+                        # ETA calculation (overwrite previous line)
+                        elapsed = time.time() - start_time
+                        avg_time = elapsed / (i + 1)
+                        remaining = avg_time * (len(players_urls) - (i + 1))
+                        eta_str = time.strftime('%M:%S', time.gmtime(remaining))
+                        # st.caption(f"ETA: {eta_str} remaining", unsafe_allow_html=True)
+
+                df = pd.DataFrame(players_updater)
                 df.to_csv("players.csv", index=False)
                 st.toast("Players database updated", icon="✅")
-                
-            st.header("Export per role players database csv")
+
+            st.header("Export players database by role")
+
             try:
                 database = pd.read_csv("players.csv")
-            except:
-                st.toast("Please update players database", icon="⚠️")
-            if st.button("Goalkeeper"):
-                csv_exporter(database, "POR")
-                st.toast("Goalkeepers csv exported", icon="✅")
-            if st.button("Defenders"):
-                csv_exporter(database, "DIF")
-                st.toast("Defenders csv exported", icon="✅")
-            if st.button("Midfielders"):
-                csv_exporter(database, "CEN")
-                st.toast("Midfielders csv exported", icon="✅")
-            if st.button("Attacking Midfielders"):
-                csv_exporter(database, "TRQ")
-                st.toast("Attacking Midfielders csv exported", icon="✅")
-            if st.button("Forwards"):
-                csv_exporter(database, "ATT")
-                st.toast("Forwards csv exported", icon="✅")
-            if st.button("All players"):
-                csv_exporter(database, "POR")
-                csv_exporter(database, "DIF")
-                csv_exporter(database, "CEN")
-                csv_exporter(database, "TRQ")
-                csv_exporter(database, "ATT")
-                st.toast("All players csv exported", icon="✅")
+            except FileNotFoundError:
+                st.warning("⚠️ Please update players database first.")
+                database = None
+
+            if database is not None:
+                roles = {
+                    "Goalkeepers": "POR",
+                    "Defenders": "DIF",
+                    "Midfielders": "CEN",
+                    "Attacking Midfielders": "TRQ",
+                    "Forwards": "ATT",
+                }
+
+                # Display buttons in two columns for a cleaner layout
+                col_a, col_b = st.columns(2)
+                for i, (role_name, role_code) in enumerate(roles.items()):
+                    col = col_a if i % 2 == 0 else col_b
+                    if col.button(role_name):
+                        csv_exporter(database, role_code)
+                        st.toast(f"{role_name} csv exported", icon="✅")
+
+                # Special "all players" button below
+                if st.button("📦 Export All Players"):
+                    for role_code in roles.values():
+                        csv_exporter(database, role_code)
+                    st.toast("All players csv exported", icon="✅")
